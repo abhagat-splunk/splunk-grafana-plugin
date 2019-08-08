@@ -54,6 +54,20 @@ export class SplunkDataSource {
 
 
     query(options) {
+        var query = this.buildQueryParams(options);
+        query.targets = query.targets.filter(t => !t.hide);
+
+        if (query.targets.length <= 0) {
+            return this.q.when({
+                data: []
+            });
+        }
+
+        if (this.templateServer.getAdhocFilters) {
+            query.adhocFilters = this.templateServer.getAdhocFilters(this.name);
+        } else {
+            query.adhocFilters = [];
+        }
 
     }
 
