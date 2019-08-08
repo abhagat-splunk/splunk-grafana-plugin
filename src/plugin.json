@@ -1,0 +1,21 @@
+{
+    "type": "datasource",
+    "name": "SplunkDS",
+    "id": "xynazog-SplunkDS-datasource",
+
+    "info": {
+        "description": "Connecting Splunk to Grafana",
+        "author": {
+            "name": "Ankit Bhagat",
+            "url": "https://xynazog.github.io"
+        },
+        "keywords": ["splunk", "datasource"],
+        "version": "1.0.0",
+        "updated": "2019-08-08"
+    },
+
+    "dependencies": {
+        "grafanaVersion": "3.x.x",
+        "plugins": []
+    }
+}
