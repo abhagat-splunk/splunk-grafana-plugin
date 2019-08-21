@@ -18,6 +18,33 @@ export class GenericDatasource {
     }
   }
 
+  createColumns(data, columns) {
+    if (columns.length > 0) {
+      return;
+    }
+    let field_names = data['data']['fields'];
+    _.map(field_names, function (field_name) {
+      columns.push({
+        "text": field_name['name'],
+        "type": "string"
+      });
+    });
+  }
+
+  createRows(data, rows, columns) {
+    if (rows.length > 0) {
+      return;
+    }
+    let field_values = data['data']['results'];
+    _.map(field_values, function (row) {
+      let temp_row = [];
+      columns.forEach(column => {
+        temp_row.push(row[column['text']]);
+      });
+      rows.push(temp_row);
+    });
+  }
+
   doRequest(options) {
     options.withCredentials = this.withCredentials;
     options.headers = this.headers;
@@ -48,6 +75,8 @@ export class GenericDatasource {
     let instance_headers = this.headers;
     let instance_creds = this.withCredentials;
     let backendSrv = this.backendSrv;
+    let createColumns = this.createColumns;
+    let createRows = this.createRows;
     var get_sid_options = {
       url: instance_url + '/services/search/jobs?output_mode=json',
       method: 'POST',
@@ -68,7 +97,7 @@ export class GenericDatasource {
           withCredentials: instance_creds
         }
         let get_results_options = {
-          url: instance_url + '/services/search/jobs/' + sid + '/results?output_mode=json_cols',
+          url: instance_url + '/services/search/jobs/' + sid + '/results?output_mode=json',
           method: 'GET',
           headers: instance_headers,
           withCredentials: instance_creds
@@ -76,49 +105,106 @@ export class GenericDatasource {
         let isDone = false,
           isFailed = false,
           isZombie = false;
+        let foundData = false;
         let retryCount = 0;
-        while (isDone != true) {
-          console.log("Going inside noobs!");
+        let columns = [];
+        let rows = [];
+        let tableResponse = [];
+        while (isDone != true && isFailed != true && isZombie != true && retryCount < 100 && foundData != true) {
           setTimeout(backendSrv.datasourceRequest(get_results_status_options).then(function (data) {
               isDone = data['data']['entry'][0]['content']['isDone'];
               isFailed = data['data']['entry'][0]['content']['isFailed'];
               isZombie = data['data']['entry'][0]['content']['isZombie'];
-              console.log("isDone Status" + isDone);
-              console.log("isFailed Status" + isFailed);
-              console.log("isZombie Status" + isZombie);
-              if (isDone === true) {
-                console.log("SID is done. Now fetch the data.");
-                backendSrv.datasourceRequest(get_results_options).then(function (data) {
-                    console.log("Found the data!");
-                    console.log(data);
-                    return;
-                  }),
-                  function (error) {
-                    console.log("Error fetching the data!");
-                    return;
-                  }
-              }
-              if (isFailed === true || isZombie === true) {
-                console.log("Failed or Zombied!");
-              }
+              // console.log("isDone Status: " + isDone);
+              // console.log("isFailed Status: " + isFailed);
+              // console.log("isZombie Status: " + isZombie);
             },
             function (error) {
               console.log("Error fetching data!");
-            }), 100000);
+            }).then(function (data) {
+            if (isDone === true && foundData === false) {
+              let results = backendSrv.datasourceRequest(get_results_options);
+              results.then(function (data) {
+                foundData = true;
+                console.log(data);
+                if (columns.length == 0 && rows.length == 0) {
+                  createColumns(data, columns);
+                  createRows(data, rows, columns);
+                  let rowColsTypeCombined = {
+                    "columns": columns,
+                    "rows": rows,
+                    "type": "table"
+                  }
+                  tableResponse.push(rowColsTypeCombined);
+                  console.log(tableResponse);
+                }
+              }, function (error) {
+                console.log("Error while fetching data");
+              });
+              return results;
+            }
+            if (isFailed === true || isZombie === true) {
+              console.log("Failed or Zombied!");
+              return;
+            }
+          }, function (error) {
+            console.log("Error fetching data");
+          }), 5000)
           retryCount++;
         }
-
-
-        // backendSrv.datasourceRequest(get_results_options).then(function (data) {
-        //   console.log("Found data!");
-        //   console.log(data);
-        // }, function (error) {
-        //   console.log("Error fetching data.");
-        // })
       },
       function (error) {
         console.log("Facing errors!");
       })
+
+
+    // while (isDone != true && isFailed != true && isZombie != true && retryCount < 100 && foundData != true) {
+    //   setTimeout(backendSrv.datasourceRequest(get_results_status_options).then(function (data) {
+    //       isDone = data['data']['entry'][0]['content']['isDone'];
+    //       isFailed = data['data']['entry'][0]['content']['isFailed'];
+    //       isZombie = data['data']['entry'][0]['content']['isZombie'];
+    //       console.log("isDone Status" + isDone);
+    //       console.log("isFailed Status" + isFailed);
+    //       console.log("isZombie Status" + isZombie);
+    //       if (isDone === true && foundData === false) {
+    //         // backendSrv.datasourceRequest(get_results_options).then(function (data) {
+    //         //     console.log(data);
+    //         //     foundData = true;
+    //         //     return;
+    //         //   }),
+    //         //   function (error) {
+    //         //     console.log("Error fetching the data!");
+    //         //     return;
+    //         //   }
+    //         let results = backendSrv.datasourceRequest(get_results_options);
+    //         results.then(function (data) {
+    //           console.log(data);
+    //           let field_names = data['data']['fields'];
+    //           _.map(field_names, function (field_name) {
+    //             columns.push({
+    //               "text": field_name,
+    //               "type": "string"
+    //             });
+    //           })
+    //           foundData = true;
+    //         }, function (error) {
+    //           console.log("Error while fetching data");
+    //         });
+    //         return results;
+    //       }
+    //       if (isFailed === true || isZombie === true) {
+    //         console.log("Failed or Zombied!");
+    //       }
+    //     },
+    //     function (error) {
+    //       console.log("Error fetching data!");
+    //     }), 5000);
+    //   retryCount++;
+    // }
+
+
+
+
 
     // console.log(logging_tryout);
 
