@@ -24,7 +24,7 @@ export class GenericDatasource {
     }
     let field_names = data['data']['fields'];
     _.map(field_names, function (field_name) {
-      if (field_name != '_si') {
+      if (field_name['name'] != '_si') {
         columns.push({
           "text": field_name['name'],
           "type": "string"
@@ -58,17 +58,8 @@ export class GenericDatasource {
   query(options) {
     var query = this.buildQueryParameters(options);
     query.targets = query.targets.filter(t => !t.hide && typeof t.target !== "undefined");
-    //console.log(query);
-    if (query.targets.length <= 0) {
-      return this.q.when({
-        data: []
-      });
-    }
-    let targetQuery = encodeURI(query.targets[0]['target']);
-    console.log("printing target query")
-    console.log(targetQuery);
-    console.log("Printing OPTIONS");
-    console.log(options);
+
+
     let instance_url = this.url;
     let instance_headers = this.headers;
     let instance_creds = this.withCredentials;
@@ -76,6 +67,55 @@ export class GenericDatasource {
     let createColumns = this.createColumns;
     let createRows = this.createRows;
     let q = this.q;
+    let emptyResponse = q.when({
+      data: []
+    });
+    //console.log(query);
+    // return this.q.when({
+    //   data: []
+    // });
+    let sample_response = [{
+      "columns": [{
+          "text": "_bkt",
+          "type": "string"
+        },
+        {
+          "text": "_cd",
+          "type": "string"
+        },
+        {
+          "text": "_indextime",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        ["_internal~37~A8020F36-8E84-49A0-96CF-7E56BA3C3F67",
+          "37:359031",
+          "1566442948"
+        ],
+        ["_internal~37~A8020F36-8E84-49A0-96CF-7E56BA3C3F67",
+          "37:359023",
+          "1566442948"
+        ],
+        ["_internal~37~A8020F36-8E84-49A0-96CF-7E56BA3C3F67",
+          "37:359015",
+          "1566442948"
+        ]
+      ],
+      "type": "table"
+    }];
+    var sampleResponse = this.q.when({
+      data: sample_response
+    });
+
+
+    if (query.targets.length <= 0) {
+      return emptyResponse;
+    }
+    //return sampleResponse;
+
+    let targetQuery = encodeURI(query.targets[0]['target']);
+
     var get_sid_options = {
       url: instance_url + '/services/search/jobs?output_mode=json',
       method: 'POST',
@@ -83,10 +123,15 @@ export class GenericDatasource {
       headers: instance_headers,
       withCredentials: instance_creds
     };
-
-    console.log("printing tryout");
+    let isDone = false,
+      isFailed = false,
+      isZombie = false;
+    let foundData = false;
+    let retryCount = 0;
+    let columns = [];
+    let rows = [];
+    let tableResponse = [];
     backendSrv.datasourceRequest(get_sid_options).then(function (data) {
-        console.log("Successful working - got the SID!");
         let sid = data['data']['sid'];
         console.log(sid);
         let get_results_status_options = {
@@ -101,28 +146,15 @@ export class GenericDatasource {
           headers: instance_headers,
           withCredentials: instance_creds
         }
-        let isDone = false,
-          isFailed = false,
-          isZombie = false;
-        let foundData = false;
-        let retryCount = 0;
-        let columns = [];
-        let rows = [];
-        let tableResponse = [];
+
         while (isDone != true && isFailed != true && isZombie != true && retryCount < 100 && foundData != true) {
           backendSrv.datasourceRequest(get_results_status_options).then(function (data) {
-              isDone = data['data']['entry'][0]['content']['isDone'];
-              isFailed = data['data']['entry'][0]['content']['isFailed'];
-              isZombie = data['data']['entry'][0]['content']['isZombie'];
-              // console.log("isDone Status: " + isDone);
-              // console.log("isFailed Status: " + isFailed);
-              // console.log("isZombie Status: " + isZombie);
-            },
-            function (error) {
-              console.log("Error fetching data!");
-              return Promise.resolve(tableResponse)
-            }).then(function (data) {
+            isDone = data['data']['entry'][0]['content']['isDone'];
+            isFailed = data['data']['entry'][0]['content']['isFailed'];
+            isZombie = data['data']['entry'][0]['content']['isZombie'];
+          }).then(function (data) {
             if (isDone === true && foundData === false) {
+              //return sampleResponse;
               let results = backendSrv.datasourceRequest(get_results_options);
               results.then(function (data) {
                 foundData = true;
@@ -136,64 +168,166 @@ export class GenericDatasource {
                   }
                   tableResponse.push(rowColsTypeCombined);
                   console.log(tableResponse);
-                  return q.when({
-                    data: tableResponse
-                  });
-                  // return Promise.resolve(tableResponse);
                 }
-              }, function (error) {
-                console.log("Error while fetching data");
+                return q.when({
+                  data: tableResponse
+                });
               });
-              return results;
+              //return results;
             } else if (isFailed === true || isZombie === true) {
               console.log("Failed or Zombied!");
-              return Promise.resolve(tableResponse);
-            } else {
-              return Promise.resolve(tableResponse);
+              //return emptyResponse;
             }
           }, function (error) {
             console.log("Error fetching data");
+            //return emptyResponse;
           });
           retryCount++;
         }
       },
       function (error) {
         console.log("Facing errors!");
-        return Promise.resolve(tableResponse);
-      })
-
-    // return this.doRequest({
-    //   url: this.url + '/query',
-    //   data: query,
-    //   method: 'POST'
-    // });
-  }
-  /*
-    query(options) {
-    var query = this.buildQueryParameters(options);
-    query.targets = query.targets.filter(t => !t.hide);
-
-    if (query.targets.length <= 0) {
-      return this.q.when({
-        data: []
+        return emptyResponse;
       });
-    }
+    //return emptyResponse;
 
-    if (this.templateSrv.getAdhocFilters) {
-      query.adhocFilters = this.templateSrv.getAdhocFilters(this.name);
-    } else {
-      query.adhocFilters = [];
-    }
-    console.log(query.targets.length);
-    console.log("Printing QUERY");
-    console.log(query);
-    return this.doRequest({
-      url: this.url + '/query',
-      data: query,
-      method: 'POST'
-    }); 
 
-  */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // return backendSrv.datasourceRequest(get_sid_options).then(function (data) {
+    //     let sid = data['data']['sid'];
+    //     console.log(sid);
+    //     let get_results_status_options = {
+    //       url: instance_url + '/services/search/jobs/' + sid + '?output_mode=json',
+    //       method: 'GET',
+    //       headers: instance_headers,
+    //       withCredentials: instance_creds
+    //     }
+    //     let get_results_options = {
+    //       url: instance_url + '/services/search/jobs/' + sid + '/results?output_mode=json',
+    //       method: 'GET',
+    //       headers: instance_headers,
+    //       withCredentials: instance_creds
+    //     }
+    //     let isDone = false,
+    //       isFailed = false,
+    //       isZombie = false;
+    //     let foundData = false;
+    //     let retryCount = 0;
+    //     let columns = [];
+    //     let rows = [];
+    //     let tableResponse = [];
+    //     return new Promise(function (resolve, reject) {
+    //       (function waitForisDone() {
+    //         backendSrv.datasourceRequest(get_results_status_options).then(function (data) {
+    //           isDone = data['data']['entry'][0]['content']['isDone'];
+    //           isFailed = data['data']['entry'][0]['content']['isFailed'];
+    //           isZombie = data['data']['entry'][0]['content']['isZombie'];
+    //         })
+    //         if (isDone != true && isFailed != true && isZombie != true && retryCount < 100 && foundData != true) {
+    //           setTimeout(waitForisDone, 30);
+    //         } else {
+    //           if (isDone === true && foundData === false) {
+    //             backendSrv.datasourceRequest(get_results_options).then(function (data) {
+    //               foundData = true;
+    //               if (columns.length == 0 && rows.length == 0) {
+    //                 createColumns(data, columns);
+    //                 createRows(data, rows, columns);
+    //                 let rowColsTypeCombined = {
+    //                   "columns": columns,
+    //                   "rows": rows,
+    //                   "type": "table"
+    //                 }
+    //                 tableResponse.push(rowColsTypeCombined);
+    //                 console.log(tableResponse);
+    //               }
+    //               return q.when({
+    //                 data: tableResponse
+    //               });
+    //             })
+    //           }
+    //         }
+    //       })();
+    //     });
+    //     while (isDone != true && isFailed != true && isZombie != true && retryCount < 100 && foundData != true) {
+    //       backendSrv.datasourceRequest(get_results_status_options).then(function (data) {
+    //           isDone = data['data']['entry'][0]['content']['isDone'];
+    //           isFailed = data['data']['entry'][0]['content']['isFailed'];
+    //           isZombie = data['data']['entry'][0]['content']['isZombie'];
+    //         },
+    //         function (error) {
+    //           console.log("Error fetching data!");
+    //           //return emptyResponse;
+    //         }).then(function (data) {
+    //         if (isDone === true && foundData === false) {
+    //           //return sampleResponse;
+    //           let results = backendSrv.datasourceRequest(get_results_options);
+    //           return results.then(function (data) {
+    //             foundData = true;
+    //             if (columns.length == 0 && rows.length == 0) {
+    //               createColumns(data, columns);
+    //               createRows(data, rows, columns);
+    //               let rowColsTypeCombined = {
+    //                 "columns": columns,
+    //                 "rows": rows,
+    //                 "type": "table"
+    //               }
+    //               tableResponse.push(rowColsTypeCombined);
+    //               console.log(tableResponse);
+    //             }
+    //             return q.when({
+    //               data: tableResponse
+    //             });
+    //           }, function (error) {
+    //             console.log("Error while fetching data");
+    //             //return emptyResponse;
+    //           });
+    //           //return results;
+    //         } else if (isFailed === true || isZombie === true) {
+    //           console.log("Failed or Zombied!");
+    //           //return emptyResponse;
+    //         }
+    //       }, function (error) {
+    //         console.log("Error fetching data");
+    //         //return emptyResponse;
+    //       });
+    //       retryCount++;
+    //     }
+    //   },
+    //   function (error) {
+    //     console.log("Facing errors!");
+    //     return emptyResponse;
+    //   });
+    // //return emptyResponse;
+  }
 
   testDatasource() {
     return this.doRequest({
