@@ -55,6 +55,9 @@ export class GenericDatasource {
     return this.backendSrv.datasourceRequest(options);
   }
 
+
+
+
   query(options) {
     var query = this.buildQueryParameters(options);
     query.targets = query.targets.filter(t => !t.hide && typeof t.target !== "undefined");
@@ -131,203 +134,323 @@ export class GenericDatasource {
     let columns = [];
     let rows = [];
     let tableResponse = [];
-    backendSrv.datasourceRequest(get_sid_options).then(function (data) {
-        let sid = data['data']['sid'];
-        console.log(sid);
-        let get_results_status_options = {
-          url: instance_url + '/services/search/jobs/' + sid + '?output_mode=json',
-          method: 'GET',
-          headers: instance_headers,
-          withCredentials: instance_creds
+
+    return backendSrv.datasourceRequest(get_sid_options).then(function (data) {
+      let sid = data['data']['sid'];
+      console.log("SID: ", sid);
+      console.log("returning sample response");
+      let get_results_status_options = {
+        url: instance_url + '/services/search/jobs/' + sid + '?output_mode=json',
+        method: 'GET',
+        headers: instance_headers,
+        withCredentials: instance_creds
+      }
+      let get_results_options = {
+        url: instance_url + '/services/search/jobs/' + sid + '/results?output_mode=json',
+        method: 'GET',
+        headers: instance_headers,
+        withCredentials: instance_creds
+      }
+      let isDone = false,
+        isFailed = false,
+        isZombie = false;
+      let foundData = false;
+      let retryCount = 0;
+      let columns = [];
+      let rows = [];
+      let tableResponse = [];
+
+
+      while (isDone != true && isFailed != true && isZombie != true && retryCount < 100 && foundData != true) {
+        backendSrv.datasourceRequest(get_results_status_options).then(function (data) {
+          isDone = data['data']['entry'][0]['content']['isDone'];
+          isFailed = data['data']['entry'][0]['content']['isFailed'];
+          isZombie = data['data']['entry'][0]['content']['isZombie'];
+          if (isDone === true && foundData !== true) {
+            foundData = true;
+            console.log("Found data but returning sample response");
+            return sampleResponse;
+            // return backendSrv.datasourceRequest(get_results_options).then(function (data) {
+            //   foundData = true;
+            //   if (columns.length == 0 && rows.length == 0) {
+            //     createColumns(data, columns);
+            //     createRows(data, rows, columns);
+            //     let rowColsTypeCombined = {
+            //       "columns": columns,
+            //       "rows": rows,
+            //       "type": "table"
+            //     }
+            //     tableResponse.push(rowColsTypeCombined);
+            //     console.log(tableResponse);
+            //     return q.when(tableResponse);
+            //   }
+            // })
+          }
+        })
+        else {
+          return q.
         }
-        let get_results_options = {
-          url: instance_url + '/services/search/jobs/' + sid + '/results?output_mode=json',
-          method: 'GET',
-          headers: instance_headers,
-          withCredentials: instance_creds
-        }
-
-        while (isDone != true && isFailed != true && isZombie != true && retryCount < 100 && foundData != true) {
-          backendSrv.datasourceRequest(get_results_status_options).then(function (data) {
-            isDone = data['data']['entry'][0]['content']['isDone'];
-            isFailed = data['data']['entry'][0]['content']['isFailed'];
-            isZombie = data['data']['entry'][0]['content']['isZombie'];
-          }).then(function (data) {
-            if (isDone === true && foundData === false) {
-              //return sampleResponse;
-              let results = backendSrv.datasourceRequest(get_results_options);
-              results.then(function (data) {
-                foundData = true;
-                if (columns.length == 0 && rows.length == 0) {
-                  createColumns(data, columns);
-                  createRows(data, rows, columns);
-                  let rowColsTypeCombined = {
-                    "columns": columns,
-                    "rows": rows,
-                    "type": "table"
-                  }
-                  tableResponse.push(rowColsTypeCombined);
-                  console.log(tableResponse);
-                }
-                return q.when({
-                  data: tableResponse
-                });
-              });
-              //return results;
-            } else if (isFailed === true || isZombie === true) {
-              console.log("Failed or Zombied!");
-              //return emptyResponse;
-            }
-          }, function (error) {
-            console.log("Error fetching data");
-            //return emptyResponse;
-          });
-          retryCount++;
-        }
-      },
-      function (error) {
-        console.log("Facing errors!");
-        return emptyResponse;
-      });
-    //return emptyResponse;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    // return backendSrv.datasourceRequest(get_sid_options).then(function (data) {
-    //     let sid = data['data']['sid'];
-    //     console.log(sid);
-    //     let get_results_status_options = {
-    //       url: instance_url + '/services/search/jobs/' + sid + '?output_mode=json',
-    //       method: 'GET',
-    //       headers: instance_headers,
-    //       withCredentials: instance_creds
-    //     }
-    //     let get_results_options = {
-    //       url: instance_url + '/services/search/jobs/' + sid + '/results?output_mode=json',
-    //       method: 'GET',
-    //       headers: instance_headers,
-    //       withCredentials: instance_creds
-    //     }
-    //     let isDone = false,
-    //       isFailed = false,
-    //       isZombie = false;
-    //     let foundData = false;
-    //     let retryCount = 0;
-    //     let columns = [];
-    //     let rows = [];
-    //     let tableResponse = [];
-    //     return new Promise(function (resolve, reject) {
-    //       (function waitForisDone() {
-    //         backendSrv.datasourceRequest(get_results_status_options).then(function (data) {
-    //           isDone = data['data']['entry'][0]['content']['isDone'];
-    //           isFailed = data['data']['entry'][0]['content']['isFailed'];
-    //           isZombie = data['data']['entry'][0]['content']['isZombie'];
-    //         })
-    //         if (isDone != true && isFailed != true && isZombie != true && retryCount < 100 && foundData != true) {
-    //           setTimeout(waitForisDone, 30);
-    //         } else {
-    //           if (isDone === true && foundData === false) {
-    //             backendSrv.datasourceRequest(get_results_options).then(function (data) {
-    //               foundData = true;
-    //               if (columns.length == 0 && rows.length == 0) {
-    //                 createColumns(data, columns);
-    //                 createRows(data, rows, columns);
-    //                 let rowColsTypeCombined = {
-    //                   "columns": columns,
-    //                   "rows": rows,
-    //                   "type": "table"
-    //                 }
-    //                 tableResponse.push(rowColsTypeCombined);
-    //                 console.log(tableResponse);
-    //               }
-    //               return q.when({
-    //                 data: tableResponse
-    //               });
-    //             })
-    //           }
-    //         }
-    //       })();
-    //     });
-    //     while (isDone != true && isFailed != true && isZombie != true && retryCount < 100 && foundData != true) {
-    //       backendSrv.datasourceRequest(get_results_status_options).then(function (data) {
-    //           isDone = data['data']['entry'][0]['content']['isDone'];
-    //           isFailed = data['data']['entry'][0]['content']['isFailed'];
-    //           isZombie = data['data']['entry'][0]['content']['isZombie'];
-    //         },
-    //         function (error) {
-    //           console.log("Error fetching data!");
-    //           //return emptyResponse;
-    //         }).then(function (data) {
-    //         if (isDone === true && foundData === false) {
-    //           //return sampleResponse;
-    //           let results = backendSrv.datasourceRequest(get_results_options);
-    //           return results.then(function (data) {
-    //             foundData = true;
-    //             if (columns.length == 0 && rows.length == 0) {
-    //               createColumns(data, columns);
-    //               createRows(data, rows, columns);
-    //               let rowColsTypeCombined = {
-    //                 "columns": columns,
-    //                 "rows": rows,
-    //                 "type": "table"
-    //               }
-    //               tableResponse.push(rowColsTypeCombined);
-    //               console.log(tableResponse);
-    //             }
-    //             return q.when({
-    //               data: tableResponse
-    //             });
-    //           }, function (error) {
-    //             console.log("Error while fetching data");
-    //             //return emptyResponse;
-    //           });
-    //           //return results;
-    //         } else if (isFailed === true || isZombie === true) {
-    //           console.log("Failed or Zombied!");
-    //           //return emptyResponse;
-    //         }
-    //       }, function (error) {
-    //         console.log("Error fetching data");
-    //         //return emptyResponse;
-    //       });
-    //       retryCount++;
-    //     }
-    //   },
-    //   function (error) {
-    //     console.log("Facing errors!");
-    //     return emptyResponse;
-    //   });
-    // //return emptyResponse;
+        retryCount++;
+      }
+    });
   }
+
+
+
+
+
+
+
+  // backendSrv.datasourceRequest(get_sid_options).then(function (data) {
+  //   let sid = data['data']['sid'];
+  //   console.log("SID: ", sid);
+  //   let get_results_status_options = {
+  //     url: instance_url + '/services/search/jobs/' + sid + '?output_mode=json',
+  //     method: 'GET',
+  //     headers: instance_headers,
+  //     withCredentials: instance_creds
+  //   }
+  //   let get_results_options = {
+  //     url: instance_url + '/services/search/jobs/' + sid + '/results?output_mode=json',
+  //     method: 'GET',
+  //     headers: instance_headers,
+  //     withCredentials: instance_creds
+  //   }
+  //   while (isDone != true && isFailed != true && isZombie != true && retryCount < 100 && foundData != true) {
+  //     console.log("Retry Count: ", retryCount);
+  //     return backendSrv.datasourceRequest(get_results_status_options).then(function (data) {
+  //       isDone = data['data']['entry'][0]['content']['isDone'];
+  //       isFailed = data['data']['entry'][0]['content']['isFailed'];
+  //       isZombie = data['data']['entry'][0]['content']['isZombie'];
+  //       console.log("isDone status: ", isDone);
+  //       console.log("isFailed status: ", isFailed);
+  //       console.log("isZombie status: ", isZombie);
+  //     }).then(function (data) {
+  //       console.log(data);
+  //       console.log("isDone Final status: ", isDone);
+  //       console.log("isFailed Final status: ", isFailed);
+  //       console.log("isZombie Final status: ", isZombie);
+  //       console.log("foundData Final status: ", foundData);
+  //       if (isDone === true && foundData !== true) {
+  //         foundData = true;
+  //         console.log("returning sampleResponse")
+  //         return sampleResponse;
+  //       } else if (isFailed === true && isZombie === true) {
+  //         console.log("Failed or Zombied");
+  //         return emptyResponse;
+  //       }
+  //       if (isDone === true) {
+  //         console.log("already found data.")
+  //         return sampleResponse;
+  //       }
+  //       return emptyResponse;
+  //     }).catch(function (error) {
+  //       console.log("error LOL");
+  //     });
+  //     retryCount++;
+  //   }
+  // })
+
+
+  // return emptyResponse;
+
+
+  // backendSrv.datasourceRequest(get_sid_options).then(function (data) {
+  //     let sid = data['data']['sid'];
+  //     console.log(sid);
+  //     let get_results_status_options = {
+  //       url: instance_url + '/services/search/jobs/' + sid + '?output_mode=json',
+  //       method: 'GET',
+  //       headers: instance_headers,
+  //       withCredentials: instance_creds
+  //     }
+  //     let get_results_options = {
+  //       url: instance_url + '/services/search/jobs/' + sid + '/results?output_mode=json',
+  //       method: 'GET',
+  //       headers: instance_headers,
+  //       withCredentials: instance_creds
+  //     }
+
+  //     while (isDone != true && isFailed != true && isZombie != true && retryCount < 100 && foundData != true) {
+  //       backendSrv.datasourceRequest(get_results_status_options).then(function (data) {
+  //         isDone = data['data']['entry'][0]['content']['isDone'];
+  //         isFailed = data['data']['entry'][0]['content']['isFailed'];
+  //         isZombie = data['data']['entry'][0]['content']['isZombie'];
+  //       }).then(function (data) {
+  //         if (isDone === true && foundData === false) {
+  //           //return sampleResponse;
+  //           let results = backendSrv.datasourceRequest(get_results_options);
+  //           results.then(function (data) {
+  //             foundData = true;
+  //             if (columns.length == 0 && rows.length == 0) {
+  //               createColumns(data, columns);
+  //               createRows(data, rows, columns);
+  //               let rowColsTypeCombined = {
+  //                 "columns": columns,
+  //                 "rows": rows,
+  //                 "type": "table"
+  //               }
+  //               tableResponse.push(rowColsTypeCombined);
+  //               console.log(tableResponse);
+  //             }
+  //             return q.when({
+  //               data: tableResponse
+  //             });
+  //           });
+  //           //return results;
+  //         } else if (isFailed === true || isZombie === true) {
+  //           console.log("Failed or Zombied!");
+  //           //return emptyResponse;
+  //         }
+  //       }, function (error) {
+  //         console.log("Error fetching data");
+  //         //return emptyResponse;
+  //       });
+  //       retryCount++;
+  //     }
+  //   },
+  //   function (error) {
+  //     console.log("Facing errors!");
+  //     return emptyResponse;
+  //   });
+  //return emptyResponse;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // return backendSrv.datasourceRequest(get_sid_options).then(function (data) {
+  //     let sid = data['data']['sid'];
+  //     console.log(sid);
+  //     let get_results_status_options = {
+  //       url: instance_url + '/services/search/jobs/' + sid + '?output_mode=json',
+  //       method: 'GET',
+  //       headers: instance_headers,
+  //       withCredentials: instance_creds
+  //     }
+  //     let get_results_options = {
+  //       url: instance_url + '/services/search/jobs/' + sid + '/results?output_mode=json',
+  //       method: 'GET',
+  //       headers: instance_headers,
+  //       withCredentials: instance_creds
+  //     }
+  //     let isDone = false,
+  //       isFailed = false,
+  //       isZombie = false;
+  //     let foundData = false;
+  //     let retryCount = 0;
+  //     let columns = [];
+  //     let rows = [];
+  //     let tableResponse = [];
+  //     return new Promise(function (resolve, reject) {
+  //       (function waitForisDone() {
+  //         backendSrv.datasourceRequest(get_results_status_options).then(function (data) {
+  //           isDone = data['data']['entry'][0]['content']['isDone'];
+  //           isFailed = data['data']['entry'][0]['content']['isFailed'];
+  //           isZombie = data['data']['entry'][0]['content']['isZombie'];
+  //         })
+  //         if (isDone != true && isFailed != true && isZombie != true && retryCount < 100 && foundData != true) {
+  //           setTimeout(waitForisDone, 30);
+  //         } else {
+  //           if (isDone === true && foundData === false) {
+  //             backendSrv.datasourceRequest(get_results_options).then(function (data) {
+  //               foundData = true;
+  //               if (columns.length == 0 && rows.length == 0) {
+  //                 createColumns(data, columns);
+  //                 createRows(data, rows, columns);
+  //                 let rowColsTypeCombined = {
+  //                   "columns": columns,
+  //                   "rows": rows,
+  //                   "type": "table"
+  //                 }
+  //                 tableResponse.push(rowColsTypeCombined);
+  //                 console.log(tableResponse);
+  //               }
+  //               return q.when({
+  //                 data: tableResponse
+  //               });
+  //             })
+  //           }
+  //         }
+  //       })();
+  //     });
+  //     while (isDone != true && isFailed != true && isZombie != true && retryCount < 100 && foundData != true) {
+  //       backendSrv.datasourceRequest(get_results_status_options).then(function (data) {
+  //           isDone = data['data']['entry'][0]['content']['isDone'];
+  //           isFailed = data['data']['entry'][0]['content']['isFailed'];
+  //           isZombie = data['data']['entry'][0]['content']['isZombie'];
+  //         },
+  //         function (error) {
+  //           console.log("Error fetching data!");
+  //           //return emptyResponse;
+  //         }).then(function (data) {
+  //         if (isDone === true && foundData === false) {
+  //           //return sampleResponse;
+  //           let results = backendSrv.datasourceRequest(get_results_options);
+  //           return results.then(function (data) {
+  //             foundData = true;
+  //             if (columns.length == 0 && rows.length == 0) {
+  //               createColumns(data, columns);
+  //               createRows(data, rows, columns);
+  //               let rowColsTypeCombined = {
+  //                 "columns": columns,
+  //                 "rows": rows,
+  //                 "type": "table"
+  //               }
+  //               tableResponse.push(rowColsTypeCombined);
+  //               console.log(tableResponse);
+  //             }
+  //             return q.when({
+  //               data: tableResponse
+  //             });
+  //           }, function (error) {
+  //             console.log("Error while fetching data");
+  //             //return emptyResponse;
+  //           });
+  //           //return results;
+  //         } else if (isFailed === true || isZombie === true) {
+  //           console.log("Failed or Zombied!");
+  //           //return emptyResponse;
+  //         }
+  //       }, function (error) {
+  //         console.log("Error fetching data");
+  //         //return emptyResponse;
+  //       });
+  //       retryCount++;
+  //     }
+  //   },
+  //   function (error) {
+  //     console.log("Facing errors!");
+  //     return emptyResponse;
+  //   });
+  // //return emptyResponse;
 
   testDatasource() {
     return this.doRequest({
